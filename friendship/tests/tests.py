@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from friendship.exceptions import AlreadyExistsError, AlreadyFriendsError
-from friendship.models import Block, Follow, Friend, FriendshipRequest
+from friendship.models import Block, Friend, FriendshipRequest
 
 TEST_TEMPLATES = os.path.join(os.path.dirname(__file__), "templates")
 
@@ -229,36 +229,6 @@ class FriendshipModelTests(BaseTestCase):
         with self.assertRaises(AlreadyExistsError):
             Friend.objects.add_friend(self.user_bob, self.user_steve, message="Foo Bar")
 
-    def test_following(self):
-        # Bob follows Steve
-        Follow.objects.add_follower(self.user_bob, self.user_steve)
-        self.assertEqual(len(Follow.objects.followers(self.user_steve)), 1)
-        self.assertEqual(len(Follow.objects.following(self.user_bob)), 1)
-        self.assertEqual(Follow.objects.followers(self.user_steve), [self.user_bob])
-        self.assertEqual(Follow.objects.following(self.user_bob), [self.user_steve])
-
-        self.assertTrue(Follow.objects.follows(self.user_bob, self.user_steve))
-        self.assertFalse(Follow.objects.follows(self.user_steve, self.user_bob))
-
-        # Duplicated requests raise a more specific subclass of IntegrityError.
-        with self.assertRaises(IntegrityError):
-            Follow.objects.add_follower(self.user_bob, self.user_steve)
-        with self.assertRaises(AlreadyExistsError):
-            Follow.objects.add_follower(self.user_bob, self.user_steve)
-
-        # Remove the relationship
-        self.assertTrue(Follow.objects.remove_follower(self.user_bob, self.user_steve))
-        self.assertEqual(len(Follow.objects.followers(self.user_steve)), 0)
-        self.assertEqual(len(Follow.objects.following(self.user_bob)), 0)
-        self.assertFalse(Follow.objects.follows(self.user_bob, self.user_steve))
-
-        # Ensure we canot follow ourselves
-        with self.assertRaises(ValidationError):
-            Follow.objects.add_follower(self.user_bob, self.user_bob)
-
-        with self.assertRaises(ValidationError):
-            Follow.objects.create(follower=self.user_bob, followee=self.user_bob)
-
     def test_blocking(self):
         # Bob blocks Steve
         Block.objects.add_block(self.user_bob, self.user_steve)
@@ -303,8 +273,8 @@ class FriendshipViewTests(BaseTestCase):
         self.assertResponse200(response)
 
         with self.settings(
-            FRIENDSHIP_CONTEXT_OBJECT_LIST_NAME="object_list",
-            TEMPLATE_DIRS=(TEST_TEMPLATES,),
+                FRIENDSHIP_CONTEXT_OBJECT_LIST_NAME="object_list",
+                TEMPLATE_DIRS=(TEST_TEMPLATES,),
         ):
             response = self.client.get(url)
             self.assertResponse200(response)
@@ -321,7 +291,7 @@ class FriendshipViewTests(BaseTestCase):
         self.assertTrue("user" in response.context)
 
         with self.settings(
-            FRIENDSHIP_CONTEXT_OBJECT_NAME="object", TEMPLATE_DIRS=(TEST_TEMPLATES,)
+                FRIENDSHIP_CONTEXT_OBJECT_NAME="object", TEMPLATE_DIRS=(TEST_TEMPLATES,)
         ):
             response = self.client.get(url)
             self.assertResponse200(response)
@@ -528,86 +498,6 @@ class FriendshipViewTests(BaseTestCase):
             response = self.client.get(url)
             self.assertResponse200(response)
 
-    def test_friendship_followers(self):
-        url = reverse("friendship_followers", kwargs={"username": "bob"})
-
-        # test that the view requires authentication to access it
-        response = self.client.get(url)
-        self.assertResponse200(response)
-
-        with self.settings(
-            FRIENDSHIP_CONTEXT_OBJECT_NAME="object", TEMPLATE_DIRS=(TEST_TEMPLATES,)
-        ):
-            response = self.client.get(url)
-            self.assertResponse200(response)
-            self.assertTrue("object" in response.context)
-
-    def test_friendship_following(self):
-        url = reverse("friendship_following", kwargs={"username": "bob"})
-
-        # test that the view requires authentication to access it
-        response = self.client.get(url)
-        self.assertResponse200(response)
-
-        with self.settings(
-            FRIENDSHIP_CONTEXT_OBJECT_NAME="object", TEMPLATE_DIRS=(TEST_TEMPLATES,)
-        ):
-            response = self.client.get(url)
-            self.assertResponse200(response)
-            self.assertTrue("object" in response.context)
-
-    def test_follower_add(self):
-        url = reverse(
-            "follower_add", kwargs={"followee_username": self.user_amy.username}
-        )
-
-        # test that the view requires authentication to access it
-        response = self.client.get(url)
-        self.assertResponse302(response)
-
-        with self.login(self.user_bob.username, self.user_pw):
-            response = self.client.get(url)
-            self.assertResponse200(response)
-
-            # on POST accept the friendship request and redirect to the
-            # friendship_following view
-            response = self.client.post(url)
-            self.assertResponse302(response)
-            redirect_url = reverse(
-                "friendship_following", kwargs={"username": self.user_bob.username}
-            )
-            self.assertTrue(redirect_url in response["Location"])
-
-            response = self.client.post(url)
-            self.assertResponse200(response)
-            self.assertTrue("errors" in response.context)
-            self.assertEqual(
-                response.context["errors"], ["User 'bob' already follows 'amy'"]
-            )
-
-    def test_follower_remove(self):
-        # create a follow relationship so we can test removing a follower
-        Follow.objects.add_follower(self.user_bob, self.user_amy)
-
-        url = reverse(
-            "follower_remove", kwargs={"followee_username": self.user_amy.username}
-        )
-
-        # test that the view requires authentication to access it
-        response = self.client.get(url)
-        self.assertResponse302(response)
-
-        with self.login(self.user_bob.username, self.user_pw):
-            response = self.client.get(url)
-            self.assertResponse200(response)
-
-            response = self.client.post(url)
-            self.assertResponse302(response)
-            redirect_url = reverse(
-                "friendship_following", kwargs={"username": self.user_bob.username}
-            )
-            self.assertTrue(redirect_url in response["Location"])
-
     def test_friendship_blockers(self):
         url = reverse("friendship_blockers", kwargs={"username": "bob"})
 
@@ -616,7 +506,7 @@ class FriendshipViewTests(BaseTestCase):
         self.assertResponse200(response)
 
         with self.settings(
-            FRIENDSHIP_CONTEXT_OBJECT_NAME="object", TEMPLATE_DIRS=(TEST_TEMPLATES,)
+                FRIENDSHIP_CONTEXT_OBJECT_NAME="object", TEMPLATE_DIRS=(TEST_TEMPLATES,)
         ):
             response = self.client.get(url)
             self.assertResponse200(response)
@@ -630,7 +520,7 @@ class FriendshipViewTests(BaseTestCase):
         self.assertResponse200(response)
 
         with self.settings(
-            FRIENDSHIP_CONTEXT_OBJECT_NAME="object", TEMPLATE_DIRS=(TEST_TEMPLATES,)
+                FRIENDSHIP_CONTEXT_OBJECT_NAME="object", TEMPLATE_DIRS=(TEST_TEMPLATES,)
         ):
             response = self.client.get(url)
             self.assertResponse200(response)

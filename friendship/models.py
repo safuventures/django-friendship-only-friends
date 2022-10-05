@@ -2,7 +2,6 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -10,12 +9,6 @@ from friendship.exceptions import AlreadyExistsError, AlreadyFriendsError
 from friendship.signals import (
     block_created,
     block_removed,
-    followee_created,
-    followee_removed,
-    follower_created,
-    follower_removed,
-    following_created,
-    following_removed,
     friendship_removed,
     friendship_request_accepted,
     friendship_request_canceled,
@@ -28,8 +21,6 @@ AUTH_USER_MODEL = getattr(settings, "AUTH_USER_MODEL", "auth.User")
 
 CACHE_TYPES = {
     "friends": "f-%s",
-    "followers": "fo-%s",
-    "following": "fl-%s",
     "blocks": "b-%s",
     "blocked": "bo-%s",
     "blocking": "bd-%s",
@@ -45,10 +36,8 @@ CACHE_TYPES = {
 
 BUST_CACHES = {
     "friends": ["friends"],
-    "followers": ["followers"],
     "blocks": ["blocks"],
     "blocked": ["blocked"],
-    "following": ["following"],
     "blocking": ["blocking"],
     "requests": [
         "requests",
@@ -287,12 +276,12 @@ class FriendshipManager(models.Manager):
             raise AlreadyFriendsError("Users are already friends")
 
         if FriendshipRequest.objects.filter(
-            from_user=from_user, to_user=to_user
+                from_user=from_user, to_user=to_user
         ).exists():
             raise AlreadyExistsError("You already requested friendship from this user.")
 
         if FriendshipRequest.objects.filter(
-            from_user=to_user, to_user=from_user
+                from_user=to_user, to_user=from_user
         ).exists():
             raise AlreadyExistsError("This user already requested friendship from you.")
 
@@ -387,109 +376,6 @@ class Friend(models.Model):
         # Ensure users can't be friends with themselves
         if self.to_user == self.from_user:
             raise ValidationError("Users cannot be friends with themselves.")
-        super().save(*args, **kwargs)
-
-
-class FollowingManager(models.Manager):
-    """Following manager"""
-
-    def followers(self, user):
-        """Return a list of all followers"""
-        key = cache_key("followers", user.pk)
-        followers = cache.get(key)
-
-        if followers is None:
-            qs = Follow.objects.filter(followee=user).select_related("follower")
-            followers = [u.follower for u in qs]
-            cache.set(key, followers)
-
-        return followers
-
-    def following(self, user):
-        """Return a list of all users the given user follows"""
-        key = cache_key("following", user.pk)
-        following = cache.get(key)
-
-        if following is None:
-            qs = Follow.objects.filter(follower=user).select_related("followee")
-            following = [u.followee for u in qs]
-            cache.set(key, following)
-
-        return following
-
-    def add_follower(self, follower, followee):
-        """Create 'follower' follows 'followee' relationship"""
-        if follower == followee:
-            raise ValidationError("Users cannot follow themselves")
-
-        relation, created = Follow.objects.get_or_create(
-            follower=follower, followee=followee
-        )
-
-        if created is False:
-            raise AlreadyExistsError(f"User '{follower}' already follows '{followee}'")
-
-        follower_created.send(sender=self, follower=follower)
-        followee_created.send(sender=self, followee=followee)
-        following_created.send(sender=self, following=relation)
-
-        bust_cache("followers", followee.pk)
-        bust_cache("following", follower.pk)
-
-        return relation
-
-    def remove_follower(self, follower, followee):
-        """Remove 'follower' follows 'followee' relationship"""
-        try:
-            rel = Follow.objects.get(follower=follower, followee=followee)
-            follower_removed.send(sender=rel, follower=rel.follower)
-            followee_removed.send(sender=rel, followee=rel.followee)
-            following_removed.send(sender=rel, following=rel)
-            rel.delete()
-            bust_cache("followers", followee.pk)
-            bust_cache("following", follower.pk)
-            return True
-        except Follow.DoesNotExist:
-            return False
-
-    def follows(self, follower, followee):
-        """Does follower follow followee? Smartly uses caches if exists"""
-        followers = cache.get(cache_key("following", follower.pk))
-        following = cache.get(cache_key("followers", followee.pk))
-
-        if followers and followee in followers:
-            return True
-        elif following and follower in following:
-            return True
-        else:
-            return Follow.objects.filter(follower=follower, followee=followee).exists()
-
-
-class Follow(models.Model):
-    """Model to represent Following relationships"""
-
-    follower = models.ForeignKey(
-        AUTH_USER_MODEL, models.CASCADE, related_name="following"
-    )
-    followee = models.ForeignKey(
-        AUTH_USER_MODEL, models.CASCADE, related_name="followers"
-    )
-    created = models.DateTimeField(default=timezone.now)
-
-    objects = FollowingManager()
-
-    class Meta:
-        verbose_name = _("Following Relationship")
-        verbose_name_plural = _("Following Relationships")
-        unique_together = ("follower", "followee")
-
-    def __str__(self):
-        return f"User #{self.follower_id} follows #{self.followee_id}"
-
-    def save(self, *args, **kwargs):
-        # Ensure users can't be friends with themselves
-        if self.follower == self.followee:
-            raise ValidationError("Users cannot follow themselves.")
         super().save(*args, **kwargs)
 
 

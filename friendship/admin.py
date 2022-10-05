@@ -1,16 +1,11 @@
 from django.contrib import admin
 
-from .models import Block, Follow, Friend, FriendshipRequest
+from .models import Block, Friend, FriendshipRequest
 
 
 class BlockAdmin(admin.ModelAdmin):
     model = Block
     raw_id_fields = ("blocker", "blocked")
-
-
-class FollowAdmin(admin.ModelAdmin):
-    model = Follow
-    raw_id_fields = ("follower", "followee")
 
 
 class FriendAdmin(admin.ModelAdmin):
@@ -24,6 +19,5 @@ class FriendshipRequestAdmin(admin.ModelAdmin):
 
 
 admin.site.register(Block, BlockAdmin)
-admin.site.register(Follow, FollowAdmin)
 admin.site.register(Friend, FriendAdmin)
 admin.site.register(FriendshipRequest, FriendshipRequestAdmin)

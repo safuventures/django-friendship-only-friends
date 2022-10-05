@@ -5,10 +5,6 @@ from friendship.views import (
     block_remove,
     blockers,
     blocking,
-    follower_add,
-    follower_remove,
-    followers,
-    following,
     friendship_accept,
     friendship_add_friend,
     friendship_cancel,
@@ -60,26 +56,6 @@ urlpatterns = [
         "friend/request/<int:friendship_request_id>/",
         view=friendship_requests_detail,
         name="friendship_requests_detail",
-    ),
-    path(
-        "followers/<slug:username>/",
-        view=followers,
-        name="friendship_followers",
-    ),
-    path(
-        "following/<slug:username>/",
-        view=following,
-        name="friendship_following",
-    ),
-    path(
-        "follower/add/<slug:followee_username>/",
-        view=follower_add,
-        name="follower_add",
-    ),
-    path(
-        "follower/remove/<slug:followee_username>/",
-        view=follower_remove,
-        name="follower_remove",
     ),
     path(
         "blockers/<slug:username>/",
