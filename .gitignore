@@ -60,3 +60,6 @@ target/
 # IDE & Editors
 .idea/
 *.sw[po]
+
+# pyenv
+.python-version
