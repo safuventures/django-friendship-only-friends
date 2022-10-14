@@ -361,6 +361,8 @@ class Friend(models.Model):
         AUTH_USER_MODEL, models.CASCADE, related_name="_unused_friend_relation"
     )
     created = models.DateTimeField(default=timezone.now)
+    is_ping = models.BooleanField(default=True)
+    is_mute = models.BooleanField(default=False)
 
     objects = FriendshipManager()
 
