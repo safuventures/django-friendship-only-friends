@@ -2,6 +2,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -281,7 +282,7 @@ class FriendshipManager(models.Manager):
             raise AlreadyExistsError("You already requested friendship from this user.")
 
         if FriendshipRequest.objects.filter(
-                from_user=to_user, to_user=from_user
+                Q(from_user=to_user) & Q(to_user=from_user) & Q(rejected__isnull=True)
         ).exists():
             raise AlreadyExistsError("This user already requested friendship from you.")
 
